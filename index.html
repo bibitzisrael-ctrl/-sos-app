@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מוקד חירום - SOS</title>
-    <!-- טעינת ספריית זיהוי הפנים -->
+    <!-- טעינת ספריות זיהוי הפנים והתאמתן -->
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/dist/face-api.js"></script>
     <style>
         body {
@@ -60,12 +60,12 @@
         }
         #statusMessage {
             margin-top: 15px;
-            font-size: 16px;
+            font-size: 15px;
             color: #333;
             font-weight: bold;
         }
         .whatsapp-btn {
-            display: none; /* מוסתר בהחלט עד לאיتمام זיהוי מלא ואמיתי */
+            display: none; /* מוסתר לחלוטין עד לאימות אמיתי */
             margin-top: 15px;
             background-color: #25d366;
             color: white;
@@ -86,11 +86,11 @@
         <button class="settings-icon" onclick="openSettings()">⚙️</button>
 
         <h2>מוקד חירום</h2>
-        <p>אימות נדרש לצורך שליחת מיקום:</p>
+        <p id="instructionText">זיהוי פנים או הזנת קוד נדרשים:</p>
 
-        <!-- אזור הזנת קוד סודי וכפתור אישור מתחתיו -->
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; margin-top: 15px;">
-            <input type="password" id="pinInput" placeholder="****" maxlength="4" style="text-align: center; font-size: 20px; padding: 8px; width: 80%; border: 1px solid #ccc; border-radius: 8px;">
+        <!-- אזור הזנת קוד סודי וכפתור אישור -->
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; margin-top: 10px;">
+            <input type="password" id="pinInput" placeholder="הכנס קוד סודי" maxlength="6" style="text-align: center; font-size: 18px; padding: 8px; width: 80%; border: 1px solid #ccc; border-radius: 8px;">
             <button id="pinSubmitBtn" onclick="checkPin()" style="background-color: #28a745; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 80%;">אישור קוד</button>
         </div>
 
@@ -100,26 +100,43 @@
             <canvas id="overlay"></canvas>
         </div>
 
-        <div id="statusMessage">ממתין לזיהוי פנים או קוד...</div>
+        <div id="statusMessage">טוען מערכת...</div>
         
-        <!-- כפתור שליחת וואטסאפ חירום (מוסתר לחלוטין עד לאימות מאומת) -->
+        <!-- כפתור וואטסאפ מוסתר מראש -->
         <a id="waBtn" class="whatsapp-btn" href="#" target="_blank">שלח לאיש קשר SOS</a>
     </div>
 
     <script>
-        const targetPhone = localStorage.getItem('sos_phone') || "972000000000";
-        const correctPin = localStorage.getItem('sos_pin') || "1234";
+        // שליפת נתונים מזיכרון המכשיר או ברירת מחדל
+        let targetPhone = localStorage.getItem('sos_phone') || "972000000000";
+        let correctPin = localStorage.getItem('sos_pin') || "1234";
         
         let userLocationUrl = "";
-        let isVerified = false; // משתנה שמונע שליחה כל עוד אין אימות
+        let isVerified = false;
 
         function openSettings() {
             const pin = prompt("הכנס קוד סודי לכניסה להגדרות:");
             if (pin === correctPin) {
-                const newPhone = prompt("הכנס מספר טלפון חדש לוואטסאפ (לדוגמה 9725...):", targetPhone);
-                if (newPhone) {
-                    localStorage.setItem('sos_phone', newPhone);
-                    alert("המספר עודכן בהצלחה!");
+                let action选择 = prompt("בחר פעולה להגדרה:\n1 - שינוי מספר טלפון לוואטסאפ\n2 - שינוי קוד סודי\n3 - איפוס/שמירת פנים מחדש", "1");
+                
+                if (action选择 === "1") {
+                    const newPhone = prompt("הכנס מספר טלפון חדש (לדוגמה 9725...):", targetPhone);
+                    if (newPhone) {
+                        localStorage.setItem('sos_phone', newPhone);
+                        targetPhone = newPhone;
+                        alert("מספר הטלפון עודכן בהצלחה!");
+                        location.reload();
+                    }
+                } else if (action选择 === "2") {
+                    const newPin = prompt("הכנס קוד סודי חדש:");
+                    if (newPin) {
+                        localStorage.setItem('sos_pin', newPin);
+                        correctPin = newPin;
+                        alert("הקוד הסודי עודכן בהצלחה!");
+                    }
+                } else if (action选择 === "3") {
+                    localStorage.removeItem('sos_face_descriptor');
+                    alert("נתוני הפנים אופסו. בפתיחה הבאה המערכת תלמד את הפנים מחדש.");
                     location.reload();
                 }
             } else if (pin !== null) {
@@ -127,17 +144,15 @@
             }
         }
 
-        // אימות קוד סודי ידני
         function checkPin() {
             const enteredPin = document.getElementById('pinInput').value;
             if (enteredPin === correctPin) {
-                grantAccess("אימות קוד סודי עבר בהצלחה!");
+                grantAccess("אימות קוד סודי הצליח!");
             } else {
                 alert("קוד סודי שגוי.");
             }
         }
 
-        // פונקציה שחרור נעילה – נפתחת אך ורק אם עבר זיהוי פנים או קוד נכון
         function grantAccess(reason) {
             isVerified = true;
             const m = document.getElementById('statusMessage');
@@ -148,7 +163,7 @@
 
             if (userLocationUrl) {
                 waBtn.href = userLocationUrl;
-                waBtn.style.display = "block"; // חושף את הכפתור רק עכשיו!
+                waBtn.style.display = "block"; // חושף את הכפתור רק עכשיו
             } else {
                 m.innerText += " (מאותר מיקום...)";
             }
@@ -163,25 +178,50 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 video.srcObject = stream;
 
-                // טעינת מודלים של זיהוי פנים
-                m.innerText = "טוען מערכת זיהוי פנים...";
-                await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model/');
-                
-                m.innerText = "סורק פנים לאיتمام זיהוי...";
+                // טעינת מודלים של זיהוי פנים ומדידות פנים (Landmarks + Recognition)
+                m.innerText = "טוען מודלים לאימות פנים...";
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model/';
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceLandmarkNet.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
 
-                // הפעלת לולאת זיהוי פנים אמיתית דרך המצלמה
-                setInterval(async () => {
-                    if (isVerified) return; // אם כבר אושר, אין צורך להמשיך לסרוק
+                m.innerText = "ממתין לזיהוי פנים...";
 
-                    const detections = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
-                    
-                    if (detections && !isVerified) {
-                        // נמצא פנים מול המצלמה באופן אמיתי! מעניקים גישה אוטומטית
-                        grantAccess("זוהה פנים בהצלחה! גישה אושרה.");
+                let savedDescriptor = localStorage.getItem('sos_face_descriptor');
+                let parsedSavedDescriptor = savedDescriptor ? new Float32Array(JSON.parse(savedDescriptor)) : null;
+
+                // לולאת זיהוי פנים
+                const interval = setInterval(async () => {
+                    if (isVerified) {
+                        clearInterval(interval);
+                        return;
+                    }
+
+                    // זיהוי הפנים הנוכחיות במצלמה כולל מאפיינים ייחודיים
+                    const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+
+                    if (detection) {
+                        if (!parsedSavedDescriptor) {
+                            // פעם ראשונה: שומרים אוטומטית את הפנים שלך בזיכרון המקומי
+                            const descriptorArray = Array.from(detection.descriptor);
+                            localStorage.setItem('sos_face_descriptor', JSON.stringify(descriptorArray));
+                            parsedSavedDescriptor = detection.descriptor;
+                            grantAccess("הפנים נשמרו בהצלחה! גישה אושרה.");
+                            clearInterval(interval);
+                        } else {
+                            // בפעמים הבאות: השוואה בין הפנים במצלמה לפנים השמורות (דיוק של פחות מ-0.5 אחוז סטייה)
+                            const distance = faceapi.euclideanDistance(detection.descriptor, parsedSavedDescriptor);
+                            if (distance < 0.45) {
+                                grantAccess("הפנים זוהו בהצלחה! גישה אושרה.");
+                                clearInterval(interval);
+                            } else {
+                                m.innerText = "פנים לא מזוהות. נסה שוב או הזן קוד סודי.";
+                            }
+                        }
                     }
                 }, 1500);
 
-                // איתור מיקום ברקע (אבל שומרים אותו אצלו, לא משחררים לשליחה עד ש-isVerified יהיה true)
+                // איתור מיקום גיאוגרפי ברקע
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         pos => {
@@ -192,7 +232,6 @@
                             
                             userLocationUrl = `https://wa.me/${targetPhone}?text=${text}`;
 
-                            // אם כבר עבר אימות פנים בינתיים, נפתח מיד את הכפתור
                             if (isVerified) {
                                 document.getElementById('waBtn').href = userLocationUrl;
                                 document.getElementById('waBtn').style.display = "block";

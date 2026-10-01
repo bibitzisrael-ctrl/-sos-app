@@ -62,9 +62,10 @@
             margin-top: 15px;
             font-size: 16px;
             color: #333;
+            font-weight: bold;
         }
         .whatsapp-btn {
-            display: none; /* מוסתר כברירת מחדל עד לאימות מלא */
+            display: none; /* מוסתר בהחלט עד לאיتمام זיהוי מלא ואמיתי */
             margin-top: 15px;
             background-color: #25d366;
             color: white;
@@ -73,6 +74,8 @@
             border-radius: 8px;
             font-weight: bold;
             font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
         }
     </style>
 </head>
@@ -83,12 +86,12 @@
         <button class="settings-icon" onclick="openSettings()">⚙️</button>
 
         <h2>מוקד חירום</h2>
-        <p>או הזן קוד גישה סודי:</p>
+        <p>אימות נדרש לצורך שליחת מיקום:</p>
 
         <!-- אזור הזנת קוד סודי וכפתור אישור מתחתיו -->
         <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; margin-top: 15px;">
             <input type="password" id="pinInput" placeholder="****" maxlength="4" style="text-align: center; font-size: 20px; padding: 8px; width: 80%; border: 1px solid #ccc; border-radius: 8px;">
-            <button id="pinSubmitBtn" onclick="checkPin()" style="background-color: #28a745; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 80%;">אישור</button>
+            <button id="pinSubmitBtn" onclick="checkPin()" style="background-color: #28a745; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 80%;">אישור קוד</button>
         </div>
 
         <!-- מצלמה וזיהוי פנים -->
@@ -97,9 +100,9 @@
             <canvas id="overlay"></canvas>
         </div>
 
-        <div id="statusMessage">טוען מערכת זיהוי פנים...</div>
+        <div id="statusMessage">ממתין לזיהוי פנים או קוד...</div>
         
-        <!-- כפתור שליחת וואטסאפ חירום (מוסתר עד לאימות) -->
+        <!-- כפתור שליחת וואטסאפ חירום (מוסתר לחלוטין עד לאימות מאומת) -->
         <a id="waBtn" class="whatsapp-btn" href="#" target="_blank">שלח לאיש קשר SOS</a>
     </div>
 
@@ -107,7 +110,8 @@
         const targetPhone = localStorage.getItem('sos_phone') || "972000000000";
         const correctPin = localStorage.getItem('sos_pin') || "1234";
         
-        let globalLocationUrl = ""; // נשמור את המיקום בצד עד לאיتمام האימות
+        let userLocationUrl = "";
+        let isVerified = false; // משתנה שמונע שליחה כל עוד אין אימות
 
         function openSettings() {
             const pin = prompt("הכנס קוד סודי לכניסה להגדרות:");
@@ -123,26 +127,30 @@
             }
         }
 
-        // פונקציית אימות הקוד הסודי - מאשרת גישה ישירה
+        // אימות קוד סודי ידני
         function checkPin() {
             const enteredPin = document.getElementById('pinInput').value;
             if (enteredPin === correctPin) {
-                alert("קוד נכון! אימות הצליח.");
-                unlockApp();
+                grantAccess("אימות קוד סודי עבר בהצלחה!");
             } else {
                 alert("קוד סודי שגוי.");
             }
         }
 
-        // פונקציה שחושפת את כפתור השליחה לוואטסאפ לאחר אימות מוצלח
-        function unlockApp() {
+        // פונקציה שחרור נעילה – נפתחת אך ורק אם עבר זיהוי פנים או קוד נכון
+        function grantAccess(reason) {
+            isVerified = true;
+            const m = document.getElementById('statusMessage');
             const waBtn = document.getElementById('waBtn');
-            if (globalLocationUrl) {
-                waBtn.href = globalLocationUrl;
-                waBtn.style.display = "block";
-                document.getElementById('statusMessage').innerText = "אימות עבר בהצלחה. ניתן לשלוח חירום.";
+
+            m.style.color = "#28a745";
+            m.innerText = reason;
+
+            if (userLocationUrl) {
+                waBtn.href = userLocationUrl;
+                waBtn.style.display = "block"; // חושף את הכפתור רק עכשיו!
             } else {
-                document.getElementById('statusMessage').innerText = "מאתר מיקום... מיד יופיע כפתור השליחה.";
+                m.innerText += " (מאותר מיקום...)";
             }
         }
 
@@ -156,19 +164,24 @@
                 video.srcObject = stream;
 
                 // טעינת מודלים של זיהוי פנים
-                m.innerText = "טוען מודלים של זיהוי פנים...";
+                m.innerText = "טוען מערכת זיהוי פנים...";
                 await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model/');
                 
-                m.innerText = "סורק פנים...";
+                m.innerText = "סורק פנים לאיتمام זיהוי...";
 
-                // זיהוי פנים לדוגמה (כאן אפשר להוסיף זיהוי אוטומטי או להמתין לקוד סודי)
-                // לצורך הדוגמה נניח שזיהוי פנים מוצלח מפעיל גם הוא את ה-unlockApp
-                setTimeout(() => {
-                    // לדוגמה: אם זיהוי הפנים עבר בהצלחה אוטומטית אחרי 3 שניות:
-                    // unlockApp();
-                }, 3000);
+                // הפעלת לולאת זיהוי פנים אמיתית דרך המצלמה
+                setInterval(async () => {
+                    if (isVerified) return; // אם כבר אושר, אין צורך להמשיך לסרוק
 
-                // בדיקת מיקום גיאוגרפי
+                    const detections = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
+                    
+                    if (detections && !isVerified) {
+                        // נמצא פנים מול המצלמה באופן אמיתי! מעניקים גישה אוטומטית
+                        grantAccess("זוהה פנים בהצלחה! גישה אושרה.");
+                    }
+                }, 1500);
+
+                // איתור מיקום ברקע (אבל שומרים אותו אצלו, לא משחררים לשליחה עד ש-isVerified יהיה true)
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         pos => {
@@ -177,11 +190,16 @@
                             const mapUrl = `https://www.google.com/maps?q=${lat},${lon}`;
                             const text = encodeURIComponent(`🚨 SOS! אני זקוק עזרה דחופה! המיקום שלי: ${mapUrl}`);
                             
-                            globalLocationUrl = `https://wa.me/${targetPhone}?text=${text}`;
-                            m.innerText = "המיקום נמצא. יש להזין קוד סודי לאימות.";
+                            userLocationUrl = `https://wa.me/${targetPhone}?text=${text}`;
+
+                            // אם כבר עבר אימות פנים בינתיים, נפתח מיד את הכפתור
+                            if (isVerified) {
+                                document.getElementById('waBtn').href = userLocationUrl;
+                                document.getElementById('waBtn').style.display = "block";
+                            }
                         },
                         error => {
-                            m.innerText = "הרשאת מיקום סגורה בדפדפן";
+                            m.innerText = "שגיאה: הרשאת מיקום סגורה בדפדפן";
                         },
                         { enableHighAccuracy: true, timeout: 10000 }
                     );

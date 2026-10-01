@@ -64,7 +64,7 @@
             color: #333;
         }
         .whatsapp-btn {
-            display: none;
+            display: none; /* מוסתר כברירת מחדל עד לאימות מלא */
             margin-top: 15px;
             background-color: #25d366;
             color: white;
@@ -99,13 +99,15 @@
 
         <div id="statusMessage">טוען מערכת זיהוי פנים...</div>
         
-        <!-- כפתור שליחת וואטסאפ חירום -->
+        <!-- כפתור שליחת וואטסאפ חירום (מוסתר עד לאימות) -->
         <a id="waBtn" class="whatsapp-btn" href="#" target="_blank">שלח לאיש קשר SOS</a>
     </div>
 
     <script>
-        const targetPhone = localStorage.getItem('sos_phone') || "972000000000"; // מספר ברירת מחדל
-        const correctPin = localStorage.getItem('sos_pin') || "1234"; // קוד ברירת מחדל
+        const targetPhone = localStorage.getItem('sos_phone') || "972000000000";
+        const correctPin = localStorage.getItem('sos_pin') || "1234";
+        
+        let globalLocationUrl = ""; // נשמור את המיקום בצד עד לאיتمام האימות
 
         function openSettings() {
             const pin = prompt("הכנס קוד סודי לכניסה להגדרות:");
@@ -121,20 +123,32 @@
             }
         }
 
+        // פונקציית אימות הקוד הסודי - מאשרת גישה ישירה
         function checkPin() {
             const enteredPin = document.getElementById('pinInput').value;
             if (enteredPin === correctPin) {
-                alert("קוד נכון! גישה מאושרת.");
-                // כאן אפשר להוסיף פעולת מעבר למסך ניהול אם תרצה
+                alert("קוד נכון! אימות הצליח.");
+                unlockApp();
             } else {
                 alert("קוד סודי שגוי.");
+            }
+        }
+
+        // פונקציה שחושפת את כפתור השליחה לוואטסאפ לאחר אימות מוצלח
+        function unlockApp() {
+            const waBtn = document.getElementById('waBtn');
+            if (globalLocationUrl) {
+                waBtn.href = globalLocationUrl;
+                waBtn.style.display = "block";
+                document.getElementById('statusMessage').innerText = "אימות עבר בהצלחה. ניתן לשלוח חירום.";
+            } else {
+                document.getElementById('statusMessage').innerText = "מאתר מיקום... מיד יופיע כפתור השליחה.";
             }
         }
 
         async function startApp() {
             const video = document.getElementById('video');
             const m = document.getElementById('statusMessage');
-            const waBtn = document.getElementById('waBtn');
 
             try {
                 m.innerText = "מפעיל מצלמה...";
@@ -147,19 +161,24 @@
                 
                 m.innerText = "סורק פנים...";
 
-                // בדיקת מיקום גיאוגרפי במקביל
+                // זיהוי פנים לדוגמה (כאן אפשר להוסיף זיהוי אוטומטי או להמתין לקוד סודי)
+                // לצורך הדוגמה נניח שזיהוי פנים מוצלח מפעיל גם הוא את ה-unlockApp
+                setTimeout(() => {
+                    // לדוגמה: אם זיהוי הפנים עבר בהצלחה אוטומטית אחרי 3 שניות:
+                    // unlockApp();
+                }, 3000);
+
+                // בדיקת מיקום גיאוגרפי
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         pos => {
                             const lat = pos.coords.latitude;
                             const lon = pos.coords.longitude;
-                            const url = `https://www.google.com/maps?q=${lat},${lon}`;
-                            const text = encodeURIComponent(`🚨 SOS! אני זקוק עזרה דחופה! המיקום שלי: ${url}`);
+                            const mapUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+                            const text = encodeURIComponent(`🚨 SOS! אני זקוק עזרה דחופה! המיקום שלי: ${mapUrl}`);
                             
-                            m.innerText = "המיקום נמצא בהצלחה!";
-                            waBtn.href = `https://wa.me/${targetPhone}?text=${text}`;
-                            waBtn.innerText = `שלח לאיש קשר SOS (${targetPhone})`;
-                            waBtn.style.display = "block";
+                            globalLocationUrl = `https://wa.me/${targetPhone}?text=${text}`;
+                            m.innerText = "המיקום נמצא. יש להזין קוד סודי לאימות.";
                         },
                         error => {
                             m.innerText = "הרשאת מיקום סגורה בדפדפן";
